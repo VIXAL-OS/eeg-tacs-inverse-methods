@@ -1,0 +1,22 @@
+# Core numerical stack
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+
+# Q-B / Q-C: real-geometry forward modeling
+mne>=1.6
+nibabel>=5.0   # required by mne for FreeSurfer surface I/O
+# nibabel ships independently but mne treats it as optional, so it's not
+# auto-installed by `pip install mne`. Adding it explicitly here so we
+# don't hit "ModuleNotFoundError: nibabel" on the first realistic-geom run.
+
+# Possibly needed for downstream Q-B/Q-C work:
+# h5io>=0.2          # mne uses for some HDF5 file I/O
+# pyvista>=0.40      # only for 3D brain visualization (GUI-required)
+# pyvistaqt>=0.10    # ditto, requires Qt backend
+# vtk>=9.2           # underlying viz backend
+# pandas>=2.0        # mne uses for some I/O paths
+# jupyter>=1.0       # if you want notebooks vs scripts
+
+# Testing (when we get there)
+# pytest>=7.4

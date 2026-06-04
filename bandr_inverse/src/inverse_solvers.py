@@ -51,7 +51,7 @@ def mne_operator(
         Measurement noise covariance. Identity if None.
     snr : float
         Signal-to-noise ratio used to set regularization:
-        lambda^2 = trace(L L^T) / (snr^2 * trace(C) * n_elec)
+        lambda^2 = trace(L L^T) / (snr^2 * trace(C))
         This is the standard MNE convention.
     depth_weighting : float in [0, 1]
         If > 0, sources weighted by column-norm of L raised to this power

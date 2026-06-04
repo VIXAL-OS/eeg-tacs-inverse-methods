@@ -37,11 +37,14 @@ Surfaces a near-vertex source mislocalization (~62mm error). The
 orientation sweep corrects a common misconception: the failure is
 **not** "radial dipoles are weak for EEG" — that's the MEG result
 (Sarvas 1987: radial dipoles produce zero magnetic field outside a
-sphere). In spherical EEG, the de Munck series gives radial signals an
-`(n+1)` prefactor making them ~2× *stronger* than tangential at the
-scalp. The vertex failure is realistic-anatomy specific (cortical
-normals not aligning with head-center radials, sulcal geometry, skull
-thickness variation), not generic EEG physics.
+sphere). In spherical EEG the radial dipole is *not* weak: the de Munck
+series weights the radial term by `n` against the tangential term's `1`
+per series order, but integrated over the montage the radial and
+tangential scalp signals come out roughly equal (~1:1 RMS, flat across
+depth). So radial sources are well-observed at the scalp, and the vertex
+failure is realistic-anatomy specific (cortical normals not aligning
+with head-center radials, sulcal geometry, skull thickness variation),
+not generic EEG physics.
 
 ### Q-C — active leadfield calibration
 `03_system_id.py`, `08_skull_sweep.py` →

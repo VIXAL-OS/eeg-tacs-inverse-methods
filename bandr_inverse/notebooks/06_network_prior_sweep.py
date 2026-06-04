@@ -130,14 +130,15 @@ def main():
     # ----- 4. Precompute network-prior operators per (K, kmeans_seed, method)
     # These depend only on L and labels, not on the network realization, so
     # we build them once and reuse across realizations.
+    np_methods = ('mne', 'sloreta', 'eloreta')
     print(f"\nPrecomputing network-prior operators: "
-          f"{len(K_values)} × {len(kmeans_seeds)} × 2 methods = "
-          f"{len(K_values) * len(kmeans_seeds) * 2} operators...")
+          f"{len(K_values)} × {len(kmeans_seeds)} × {len(np_methods)} methods = "
+          f"{len(K_values) * len(kmeans_seeds) * len(np_methods)} operators...")
     np_operators: dict = {}
     for K in K_values:
         for sd in kmeans_seeds:
             labels = parcellate_source_space(sources, K, random_state=sd)
-            for method in ('mne', 'sloreta'):
+            for method in np_methods:
                 K_voxel, _, _ = network_prior_operator(
                     L, labels, snr=3.0, n_parcels=K,
                     normalize='unit_l2', method=method,
@@ -154,7 +155,7 @@ def main():
         'per-voxel eLORETA': np.empty(len(network_seeds)),
     }
     rc_np = {(m, K): np.empty((len(network_seeds), len(kmeans_seeds)))
-             for m in ('mne', 'sloreta') for K in K_values}
+             for m in np_methods for K in K_values}
 
     # Also keep cluster-center positions and node positions for diagnostics
     network_summary = []
@@ -212,7 +213,7 @@ def main():
         # Network-prior methods
         for si, sd in enumerate(kmeans_seeds):
             for K in K_values:
-                for method in ('mne', 'sloreta'):
+                for method in np_methods:
                     K_op = np_operators[(K, sd, method)]
                     J_hat = K_op @ V
                     per_src = per_source_amplitude(J_hat)
@@ -233,25 +234,35 @@ def main():
         print(f"  {name:32s}  mean={v.mean():.3f}  std={v.std():.3f}  "
               f"n={len(v)}")
     print()
-    print(f"  {'network-prior method':32s}  K   mean   std   n   "
-          f"win-rate vs per-voxel sLORETA")
     pv_slo = rc_pv['per-voxel sLORETA']
-    for method in ('sloreta', 'mne'):
+    pv_elo = rc_pv['per-voxel eLORETA']
+    # Each network-prior method is compared against its same-family per-voxel
+    # baseline (the natural Greg-test). MNE-on-reduced has no per-voxel MNE
+    # row in this sweep, so we keep its historical comparison vs per-voxel
+    # sLORETA (a documented bound on what a per-voxel solver achieves).
+    baseline_for = {
+        'sloreta': ('per-voxel sLORETA', pv_slo),
+        'eloreta': ('per-voxel eLORETA', pv_elo),
+        'mne':     ('per-voxel sLORETA', pv_slo),
+    }
+    print(f"  {'network-prior method':28s}  K   mean   std   n   "
+          f"win-rate vs same-family per-voxel baseline")
+    for method in ('sloreta', 'eloreta', 'mne'):
+        baseline_name, pv = baseline_for[method]
         for K in K_values:
             arr = rc_np[(method, K)]   # (n_real, n_seeds)
             flat = arr[~np.isnan(arr)]
             # Per-realization-per-seed comparison against the per-voxel value
             # for that same realization
-            pv_broadcast = np.broadcast_to(
-                pv_slo[:, None], arr.shape
-            )
+            pv_broadcast = np.broadcast_to(pv[:, None], arr.shape)
             valid = ~np.isnan(arr) & ~np.isnan(pv_broadcast)
             n_compared = int(valid.sum())
             n_wins = int(((arr > pv_broadcast) & valid).sum())
             wr = n_wins / max(n_compared, 1)
-            print(f"  network-prior {method.upper():4s}  on reduced     "
+            print(f"  np-{method.upper():7s} on reduced   "
                   f"K={K:3d}  {flat.mean():.3f}  {flat.std():.3f}  "
-                  f"{len(flat):3d}   {n_wins:3d}/{n_compared}  ({wr:.0%})")
+                  f"{len(flat):3d}   {n_wins:3d}/{n_compared}  ({wr:.0%}) "
+                  f"vs {baseline_name}")
         print()
 
     # ----- 7. Plot 1: mean ± std band vs K -------------------------------
@@ -273,6 +284,7 @@ def main():
     # Network-prior curves
     for method, color, marker, label in [
         ('sloreta', '#2A9D8F', 'o', 'network-prior sLOR on reduced'),
+        ('eloreta', '#8E44AD', '^', 'network-prior eLOR on reduced'),
         ('mne',     '#E76F51', 's', 'network-prior MNE on reduced'),
     ]:
         means = np.array([np.nanmean(rc_np[(method, K)]) for K in K_values])
@@ -303,42 +315,50 @@ def main():
     plt.close(fig)
     print(f"\nSweep figure: {out_path}")
 
-    # ----- 8. Plot 2: per-realization win-rate heatmap -------------------
-    # Rows = realization, cols = K. Each cell = win-rate across k-means seeds
-    # for network-prior sLOR vs per-voxel sLORETA on this realization.
-    win_arr = np.full((len(network_seeds), len(K_values)), np.nan)
-    for ni in range(len(network_seeds)):
-        if np.isnan(pv_slo[ni]):
-            continue
-        for ki, K in enumerate(K_values):
-            seeds_arr = rc_np[('sloreta', K)][ni, :]
-            valid = ~np.isnan(seeds_arr)
-            if not valid.any():
+    # ----- 8. Plot 2: per-realization win-rate heatmaps ------------------
+    # Each cell = win-rate across k-means seeds for network-prior method >
+    # same-family per-voxel baseline on this realization. Two panels:
+    # sLOR-vs-sLOR (the original Q-D comparison) and eLOR-vs-eLOR (the
+    # Greg test — does the prior help the *good* inverse?).
+    def _winrate_grid(method_key: str, baseline_vec: np.ndarray) -> np.ndarray:
+        arr = np.full((len(network_seeds), len(K_values)), np.nan)
+        for ni in range(len(network_seeds)):
+            if np.isnan(baseline_vec[ni]):
                 continue
-            wins = int((seeds_arr[valid] > pv_slo[ni]).sum())
-            win_arr[ni, ki] = wins / int(valid.sum())
+            for ki, K in enumerate(K_values):
+                seeds_arr = rc_np[(method_key, K)][ni, :]
+                valid = ~np.isnan(seeds_arr)
+                if not valid.any():
+                    continue
+                wins = int((seeds_arr[valid] > baseline_vec[ni]).sum())
+                arr[ni, ki] = wins / int(valid.sum())
+        return arr
 
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
-    im = ax2.imshow(win_arr, aspect='auto', cmap='RdYlGn',
-                    vmin=0, vmax=1, interpolation='nearest')
-    for ni in range(len(network_seeds)):
-        for ki in range(len(K_values)):
-            v = win_arr[ni, ki]
-            if np.isnan(v):
-                txt = 'n/a'
-            else:
-                txt = f'{v:.0%}'
-            ax2.text(ki, ni, txt, ha='center', va='center', fontsize=9,
-                     color='black' if 0.25 < v < 0.75 else 'white')
-    ax2.set_xticks(range(len(K_values)))
-    ax2.set_xticklabels([f'K={K}' for K in K_values])
-    ax2.set_yticks(range(len(network_seeds)))
-    ax2.set_yticklabels([f'net seed {s}' for s in network_seeds])
-    ax2.set_title(
-        'Per-realization win-rate: network-prior sLOR > per-voxel sLORETA\n'
-        f'(fraction of {len(kmeans_seeds)} k-means seeds per cell)'
-    )
-    plt.colorbar(im, ax=ax2, label='fraction of k-means seeds where np-sLOR wins')
+    win_slo = _winrate_grid('sloreta', pv_slo)
+    win_elo = _winrate_grid('eloreta', pv_elo)
+
+    fig2, axes2 = plt.subplots(1, 2, figsize=(15, 5))
+    for ax_w, win_arr, title in [
+        (axes2[0], win_slo, 'np-sLOR > per-voxel sLORETA'),
+        (axes2[1], win_elo, 'np-eLOR > per-voxel eLORETA'),
+    ]:
+        im = ax_w.imshow(win_arr, aspect='auto', cmap='RdYlGn',
+                         vmin=0, vmax=1, interpolation='nearest')
+        for ni in range(len(network_seeds)):
+            for ki in range(len(K_values)):
+                v = win_arr[ni, ki]
+                txt = 'n/a' if np.isnan(v) else f'{v:.0%}'
+                ax_w.text(ki, ni, txt, ha='center', va='center', fontsize=9,
+                          color='black' if 0.25 < v < 0.75 else 'white')
+        ax_w.set_xticks(range(len(K_values)))
+        ax_w.set_xticklabels([f'K={K}' for K in K_values])
+        ax_w.set_yticks(range(len(network_seeds)))
+        ax_w.set_yticklabels([f'net seed {s}' for s in network_seeds])
+        ax_w.set_title(
+            f'{title}\n(fraction of {len(kmeans_seeds)} k-means seeds per cell)',
+            fontsize=10,
+        )
+        plt.colorbar(im, ax=ax_w, label='win fraction')
     plt.tight_layout()
     out_path2 = os.path.join(
         os.path.dirname(__file__), '..', 'figures',
@@ -352,27 +372,38 @@ def main():
     print("\n" + "=" * 72)
     print("VERDICT")
     print("=" * 72)
-    # Plateau test: K values where network-prior sLOR mean > per-voxel sLOR mean
-    pv_slo_mean = float(np.nanmean(pv_slo))
-    pv_slo_std = float(np.nanstd(pv_slo))
-    print(f"  per-voxel sLORETA baseline: {pv_slo_mean:.3f} ± {pv_slo_std:.3f}")
-    print(f"  K values where np-sLOR mean > per-voxel sLORETA mean:")
-    for K in K_values:
-        m = float(np.nanmean(rc_np[('sloreta', K)]))
-        s = float(np.nanstd(rc_np[('sloreta', K)]))
-        flag = ' <-- exceeds baseline by >1 std' if m > pv_slo_mean + pv_slo_std else ''
-        bf = '+' if m > pv_slo_mean else ' '
-        print(f"    K={K:3d}: {m:.3f} ± {s:.3f}  ({bf}vs baseline){flag}")
-    overall_wins = sum(
-        int((rc_np[('sloreta', K)] > pv_slo[:, None])[~np.isnan(rc_np[('sloreta', K)])].sum())
-        for K in K_values
-    )
-    overall_total = sum(
-        int((~np.isnan(rc_np[('sloreta', K)])).sum()) for K in K_values
-    )
-    print(f"  Overall np-sLOR > per-voxel sLORETA win-rate (all K, all seeds, "
-          f"all realizations): {overall_wins}/{overall_total} = "
-          f"{overall_wins/max(overall_total,1):.0%}")
+
+    def _verdict(method_key: str, baseline_name: str, baseline_vec: np.ndarray):
+        b_mean = float(np.nanmean(baseline_vec))
+        b_std = float(np.nanstd(baseline_vec))
+        label = method_key.upper()
+        print(f"\n  [{label}-on-reduced vs {baseline_name}]")
+        print(f"    {baseline_name} baseline: {b_mean:.3f} ± {b_std:.3f}")
+        print(f"    K values where np-{label} mean > {baseline_name} mean:")
+        for K in K_values:
+            m = float(np.nanmean(rc_np[(method_key, K)]))
+            s = float(np.nanstd(rc_np[(method_key, K)]))
+            flag = (' <-- exceeds baseline by >1 std'
+                    if m > b_mean + b_std else '')
+            bf = '+' if m > b_mean else ' '
+            print(f"      K={K:3d}: {m:.3f} ± {s:.3f}  ({bf}vs baseline){flag}")
+        overall_wins = sum(
+            int(((rc_np[(method_key, K)] > baseline_vec[:, None])
+                 & ~np.isnan(rc_np[(method_key, K)]))[
+                ~np.isnan(rc_np[(method_key, K)])].sum())
+            for K in K_values
+        )
+        overall_total = sum(
+            int((~np.isnan(rc_np[(method_key, K)])).sum()) for K in K_values
+        )
+        print(f"    Overall np-{label} > {baseline_name} win-rate "
+              f"(all K × seeds × realizations): {overall_wins}/{overall_total} = "
+              f"{overall_wins/max(overall_total,1):.0%}")
+
+    # The Greg test: does the region-grouping prior help the *good* inverse?
+    # Reported alongside the original sLORETA comparison.
+    _verdict('sloreta', 'per-voxel sLORETA', pv_slo)
+    _verdict('eloreta', 'per-voxel eLORETA', pv_elo)
     print("=" * 72)
 
 

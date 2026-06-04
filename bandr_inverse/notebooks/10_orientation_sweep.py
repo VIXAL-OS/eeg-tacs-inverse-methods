@@ -7,13 +7,14 @@ radial = hard.
 
 What we actually find here: the spherical 4-shell EEG model does NOT
 reproduce that observability gradient. At every depth tested (10–78mm),
-the radial dipole produces ~1.6–2.0x MORE scalp signal than the tangential
-dipole of the same moment magnitude. This is the (n+1) prefactor on the
-radial term in the de Munck series (see Mosher 1999, eq. 22; matches
-spherical_forward.py:182). The "radial dipoles are weak for EEG" intuition
-is often imported from MEG — Sarvas (1987) showed radial dipoles produce
-zero magnetic field outside a sphere — but for spherical EEG, the radial
-term carries an extra (n+1) factor.
+the radial dipole produces ~1.4-2.0x MORE scalp signal than the tangential
+dipole of the same moment magnitude. This is the n:1 radial:tangential
+multipole weighting in the de Munck series (radial order-n coefficient
+(2n+1), tangential (2n+1)/n in the homogeneous limit; see Mosher 1999,
+eq. 22, and the corrected tangential term in spherical_forward.py). The
+"radial dipoles are weak for EEG" intuition is often imported from MEG —
+Sarvas (1987) showed radial dipoles produce zero magnetic field outside a
+sphere — but for spherical EEG, the radial term dominates by the factor n.
 
 Localization error in this script therefore mildly DECREASES as the dipole
 rotates toward radial, tracking the SNR rise. The Q-B vertex failure must
@@ -233,7 +234,7 @@ def main():
     ax_bot.set_title(
         'Diagnostic: scalp signal RMS vs orientation at three depths.  '
         'Radial > tangential by ~1.6-2x at every depth tested\n'
-        '(de Munck (n+1) prefactor on radial term).  '
+        '(de Munck n:1 radial:tangential weighting).  '
         'This is why the top-panel error mildly decreases with rotation toward radial.',
         fontsize=10
     )

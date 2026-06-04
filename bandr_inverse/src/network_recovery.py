@@ -43,7 +43,7 @@ from typing import Literal
 from scipy.cluster.vq import kmeans2
 
 from spherical_forward import SphericalHeadModel, forward_potential
-from inverse_solvers import mne_operator, sloreta_operator
+from inverse_solvers import mne_operator, sloreta_operator, eloreta_operator
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +298,9 @@ def network_prior_operator(
     snr: float = 3.0,
     n_parcels: int | None = None,
     normalize: Literal['binary', 'mean', 'unit_l2'] = 'unit_l2',
-    method: Literal['mne', 'sloreta'] = 'mne',
+    method: Literal['mne', 'sloreta', 'eloreta'] = 'mne',
+    eloreta_max_iter: int = 50,
+    eloreta_tol: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Network-prior inverse: assume J = G a, solve for a on the reduced
     leadfield L_net = L @ G.
@@ -316,8 +318,14 @@ def network_prior_operator(
                        that bias by dividing each row of the MNE operator
                        by sqrt(diag(R)) where R = K_mne @ L_net.
 
-    Reuses inverse_solvers.{mne,sloreta}_operator on L_net, so the snr
-    convention is identical to the per-voxel solvers in this codebase.
+    method='eloreta' — adaptive-alpha eLORETA on L_net. The per-voxel
+                       backend that wins Q-A on deep sources; this is the
+                       honest test of "does the region-grouping prior help
+                       the *good* inverse?" The reduced n_elec×K system is
+                       small (K up to ~60 here), so the iteration is cheap.
+
+    Reuses inverse_solvers.{mne,sloreta,eloreta}_operator on L_net, so the
+    snr convention is identical to the per-voxel solvers in this codebase.
 
     Returns
     -------
@@ -334,6 +342,10 @@ def network_prior_operator(
         K_parcel = mne_operator(L_net, snr=snr, depth_weighting=0.0)
     elif method == 'sloreta':
         K_parcel = sloreta_operator(L_net, snr=snr)
+    elif method == 'eloreta':
+        K_parcel = eloreta_operator(L_net, snr=snr,
+                                    max_iter=eloreta_max_iter,
+                                    tol=eloreta_tol, verbose=False)
     else:
         raise ValueError(f"unknown method={method!r}")
     K_voxel = G @ K_parcel

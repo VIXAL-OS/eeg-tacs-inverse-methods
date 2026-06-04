@@ -179,9 +179,19 @@ def forward_potential(
         n_int = int(n)
         P_n = lpmv(0, n_int, cos_theta)
         P_n1 = lpmv(1, n_int, cos_theta)
+        # Radial and tangential dipole components enter at order n with
+        # multipole strengths n and 1 respectively (de Munck 1988; Mosher
+        # 1999 eq. 22; Yao 2000). With c_n defined as below, the homogeneous
+        # limit gives c_n = (2n+1)/(n+1), so the radial surface coefficient
+        # (n+1)*c_n = (2n+1) is already correct. The tangential coefficient
+        # must therefore be (n+1)/n * c_n so that it equals (2n+1)/n, giving
+        # the correct radial:tangential ratio of n:1. (A bare c_n here is too
+        # small by n/(n+1) and inflates the radial:tangential ratio to n+1:1;
+        # verified to machine precision against the Yao closed form in the
+        # homogeneous limit.)
         V += (n + 1) * c[idx] * depth_pow[idx] * P_n * moment_radial
         if moment_tang_mag > 1e-15:
-            V += c[idx] * depth_pow[idx] * P_n1 * cos_phi * moment_tang_mag
+            V += (n + 1) / n * c[idx] * depth_pow[idx] * P_n1 * cos_phi * moment_tang_mag
 
     return prefactor * V
 

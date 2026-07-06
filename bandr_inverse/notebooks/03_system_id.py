@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 from dataclasses import replace
 
 from spherical_forward import (
-    SphericalHeadModel, forward_potential, make_standard_montage_64
+    SphericalHeadModel, forward_potential, make_gsn_montage_64
 )
 from inverse_solvers import (
     mne_operator, sloreta_operator, eloreta_operator
@@ -732,7 +732,7 @@ def main():
     print("=" * 60)
 
     template_model = SphericalHeadModel()
-    electrodes = make_standard_montage_64(template_model)
+    electrodes = make_gsn_montage_64(template_model)
     print(f"\nTemplate model: 4-shell sphere")
     print(f"  sigmas (S/m) = {template_model.sigmas}")
     print(f"  electrodes = {electrodes.shape[0]}")

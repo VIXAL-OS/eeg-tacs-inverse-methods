@@ -17,8 +17,17 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Data — raw inputs not meant for the repo
+# Data — raw inputs not meant for the repo (large: DWI/MRI, FEM meshes, leadfields, EEG).
+# NOTE: .gitignore does NOT support inline comments — each pattern is on its own line.
 data/
+# LEMON raw BrainVision RSEEG (GWDG), ~302MB/subject
+lemon_eeg/
+bandr_inverse/lemon_eeg/
+# OpenNeuro DWI/MRI + all qe_* derivatives (charm meshes, leadfields) — huge
+ds000221/
+# SimNIBS leadfields (hundreds of MB) and FEM meshes, wherever they land
+*.hdf5
+*.msh
 
 # Internal Claude scratch (memory files live elsewhere; this catches a stray)
 MEMORY.md

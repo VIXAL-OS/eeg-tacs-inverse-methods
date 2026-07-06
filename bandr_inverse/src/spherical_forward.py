@@ -1,4 +1,4 @@
-"""
+﻿"""
 Analytic forward solution for a multi-shell spherical head model.
 
 Implements the multi-shell series solution for the electric potential
@@ -31,10 +31,11 @@ Numerical notes
 ---------------
 We work in *normalized* coordinates (radii relative to head radius R) to
 avoid overflow at high series order. Inputs/outputs use physical units
-(mm for positions, A·m for dipole moments, V for potentials).
+(mm for positions, AÂ·m for dipole moments, V for potentials).
 """
 from __future__ import annotations
 import numpy as np
+import os
 from dataclasses import dataclass
 from typing import Tuple
 from scipy.special import lpmv
@@ -197,7 +198,10 @@ def forward_potential(
 
 
 def make_standard_montage_64(model: SphericalHeadModel | None = None) -> np.ndarray:
-    """Generate 64 quasi-uniform electrode positions on upper hemisphere."""
+    """LEGACY Fibonacci-spiral stand-in: 64 quasi-uniform electrodes on the upper
+    hemisphere. The montage-robust results (Q-A..Q-D, Q0) were generated with this.
+    For REAL EGI positions (a commercial HD-EEG geodesic net) use
+    make_gsn_montage_64 -- used for real-position montage work."""
     if model is None:
         model = SphericalHeadModel()
     R = model.head_radius_mm
@@ -209,3 +213,19 @@ def make_standard_montage_64(model: SphericalHeadModel | None = None) -> np.ndar
     y = R * np.sin(phi) * np.sin(theta)
     z = R * np.cos(phi)
     return np.column_stack([x, y, z])
+
+
+def make_gsn_montage_64(model: SphericalHeadModel | None = None) -> np.ndarray:
+    """Real 64-ch EGI HydroCel Geodesic Sensor Net (= a commercial HD-EEG geodesic net) layout,
+    projected onto the model scalp sphere. Loads the exported EGI coordinates
+    (bandr_inverse/montages/GSN-HydroCel-64.csv; MNE head frame, metres) and radially
+    projects each electrode direction onto the sphere of radius model.head_radius_mm,
+    preserving the geodesic angular layout. Canonical montage for real-position work
+    (channel selection). NB: template geodesic positions, not subject-digitized."""
+    if model is None:
+        model = SphericalHeadModel()
+    R = model.head_radius_mm
+    csv = os.path.join(os.path.dirname(__file__), "..", "montages", "GSN-HydroCel-64.csv")
+    P = np.loadtxt(csv, delimiter=",", skiprows=1, usecols=(1, 2, 3))   # (64,3) metres
+    dirs = P / np.linalg.norm(P, axis=1, keepdims=True)
+    return dirs * R

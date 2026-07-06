@@ -4,8 +4,11 @@ Simulation and validation code for an EEG source-localization and
 transcranial alternating current stimulation (tACS) targeting pipeline.
 Establishes which inverse methods recover sources reliably under
 realistic noise, quantifies why a forward model is necessary for
-multi-channel stimulation, and shows that active calibration enables
-robust open-loop field targeting on a realistic head geometry.
+multi-channel stimulation, shows that active calibration enables
+robust open-loop field targeting on a realistic head geometry, and
+characterizes the fundamental **observability ceiling** that bounds any
+read-side inverse — a fixed handful of observable spatial degrees of
+freedom that no richer prior, parcellation, or spectral trick can enlarge.
 
 This repo is the methods/validation slice of a larger system. The
 device-faithful control law simulation and the electrode-subset
@@ -14,8 +17,9 @@ below).
 
 ## What's in here
 
-Five validation experiments + one motivation figure. Each is a
-self-contained script in `bandr_inverse/notebooks/` that produces a
+Five validation experiments, an observability-ceiling analysis, and one
+motivation figure. Each is a self-contained script (in
+`bandr_inverse/notebooks/` or `bandr_inverse/qe/`) that produces a
 figure in `bandr_inverse/figures/`.
 
 ### Q-A — sphere sanity check
@@ -95,6 +99,64 @@ distributed sources; sub-cluster splits are rank-limited at 64
 electrodes regardless of algorithm (an oracle-Voronoi probe doesn't
 beat the blind partition either). The binding constraint is
 observability, not algorithmic.
+
+### The observability ceiling — why a richer prior can't help
+`qe/realistic_rank.py`, `qe/realistic_rank_plot.py`,
+`notebooks/11_gdvae_precheck_run.py`, `notebooks/11b_gdvae_precheck_multiseed.py`,
+`freq_leadfield_sim.py`
+
+Q-D's "observability, not algorithm" conclusion is a specific,
+quantifiable claim: at realistic SNR the 64-channel scalp leadfield `L`
+transmits only a handful of effective spatial degrees of freedom. Its
+singular-value spectrum falls off a cliff — dropping below the SNR floor
+after ~3–5 modes (`r_L ≈ 3–5`). Everything a linear inverse can recover
+lives in that observable subspace; the rest is null space. Three
+independent checks triangulate the same ceiling:
+
+**Realistic-anatomy rank** (`realistic_rank*.py`). The `r_L ≈ 3–5` cliff
+is not an artifact of the idealized sphere. An SVD of a realistic
+finite-element-method leadfield — heterogeneous skull, free source
+orientation, more channels — sits in the same handful-of-modes regime.
+Realism *lowers* the ceiling if anything; it does not raise it.
+
+**Prior expressiveness — the GD-VAE pre-check** (`11_gdvae_precheck_run.py`,
+`11b_*`). Before building a *GD-VAE* source prior — a Geometric Dynamic
+Variational Autoencoder (Lopez & Atzberger 2022, arXiv:2206.05183; publ.
+*J. Comput. Phys.* 2025): a variational autoencoder (Kingma & Welling
+2013, *Auto-Encoding Variational Bayes*, arXiv:1312.6114) whose latent
+lives on a specified geometric/topological manifold, e.g. a torus — here
+proposed as a *nonlinear* replacement for a linear source prior like
+sLORETA — we ran a training-free go/no-go: *could
+such a model even beat linear localization here?* The answer is no, and
+the argument needs no training. The measurement factors through a fixed
+linear map, `V = L·J + ε`. By the **data-processing inequality** (Cover &
+Thomas, *Elements of Information Theory*), no estimator `Ĵ = f(V)` —
+linear, nonlinear, manifold, or GD-VAE — can recover more about `J` than
+`V` carries, which is bounded by `L`'s SNR-observable subspace. A
+nonlinear decoder `J = g(z)` enters the forward model only as `L·g(z)`,
+so its reachable directions still lie inside `colspace(L)`. Per-voxel
+sLORETA already spans that subspace, so a richer prior can only fill the
+*unobservable null space by assumption* — precisely the inverse-crime-
+adjacent failure that produced Q-D's 34% wall, not an observability gain.
+**Decision: skip the build.** The lever that raises `r_L` is more (or
+better-placed) channels, not a more expressive prior.
+
+**Spectral coloring** (`freq_leadfield_sim.py`, with
+`freq_conductivity_review.md`). A third axis: does frequency-dependent
+conductivity/permittivity open new observable directions per band — a
+"colored-filters" resolution gain? No. Frequency only reweights the same
+spatial (Legendre) basis through the per-degree shell gain `gₙ(ω)`; the
+per-band leadfields stay near-collinear, and stacking nine bands adds
+zero resolvable dimensions at every realistic SNR. (Permittivity is a
+write-side dose-accuracy concern, not a read-side resolution lever.)
+
+**The unification.** Three orthogonal levers — a richer prior, a
+parcellation (Q-D), and multi-band spectral coloring — each fail to
+enlarge the same low-dimensional observable subspace. The 64-channel
+scalp leadfield has a fixed handful of observable spatial degrees of
+freedom; only channel count and placement move it. This is a
+property-of-the-physics floor, so — like Q0 — it hardens under scrutiny
+rather than flaking.
 
 ### Q0 — locality motivation
 `07_locality_motivation.py` → `figures/q0_locality_motivation.png`

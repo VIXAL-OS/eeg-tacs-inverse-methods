@@ -1,20 +1,20 @@
-"""
-Orientation sweep at a fixed position — what the spherical EEG model says.
+﻿"""
+Orientation sweep at a fixed position â€” what the spherical EEG model says.
 
 The original intent: turn the Q-B realistic-cortex radial-dipole failure
-(~62mm vertex error) into a continuum, expecting tangential = easy →
+(~62mm vertex error) into a continuum, expecting tangential = easy â†’
 radial = hard.
 
 What we actually find here: the spherical 4-shell EEG model does NOT
-reproduce that observability gradient. At every depth tested (10–78mm),
+reproduce that observability gradient. At every depth tested (10â€“78mm),
 the radial dipole produces ~1.4-2.0x MORE scalp signal than the tangential
 dipole of the same moment magnitude. This is the n:1 radial:tangential
 multipole weighting in the de Munck series (radial order-n coefficient
 (2n+1), tangential (2n+1)/n in the homogeneous limit; see Mosher 1999,
 eq. 22, and the corrected tangential term in spherical_forward.py). The
-"radial dipoles are weak for EEG" intuition is often imported from MEG —
+"radial dipoles are weak for EEG" intuition is often imported from MEG â€”
 Sarvas (1987) showed radial dipoles produce zero magnetic field outside a
-sphere — but for spherical EEG, the radial term dominates by the factor n.
+sphere â€” but for spherical EEG, the radial term dominates by the factor n.
 
 Localization error in this script therefore mildly DECREASES as the dipole
 rotates toward radial, tracking the SNR rise. The Q-B vertex failure must
@@ -31,13 +31,13 @@ Setup:
   - Noise std calibrated to tangential signal *RMS* (matched-filter SNR
     convention; std would overstate the radial SNR advantage because
     radial scalp patterns are less zero-mean across this montage).
-  - 5 noise seeds → mean ± std bands. Not a beats-baseline claim; a
-    geometry property — but the seeds protect against single-draw
-    artefacts as per CLAUDE.md.
+  - 5 noise seeds â†’ mean Â± std bands. Not a beats-baseline claim; a
+    geometry property â€” but the seeds protect against single-draw
+    artefacts.
 
 Two-panel figure:
-  TOP    — localization error vs orientation, 4 methods, depth=50mm.
-  BOTTOM — scalp signal RMS vs orientation at 3 depths (20/50/70mm), the
+  TOP    â€” localization error vs orientation, 4 methods, depth=50mm.
+  BOTTOM â€” scalp signal RMS vs orientation at 3 depths (20/50/70mm), the
            diagnostic that explains the top panel.
 """
 from __future__ import annotations
@@ -217,7 +217,7 @@ def main():
         f'Spherical EEG, free-orientation inverse. Fixed pos '
         f'{tuple(true_pos.astype(int))} mm (depth {np.linalg.norm(true_pos):.0f} mm).  '
         f'Mean +/- std across {len(seeds)} noise seeds.\n'
-        f'Expected tangential-easy -> radial-hard NOT reproduced — '
+        f'Expected tangential-easy -> radial-hard NOT reproduced â€” '
         f'in this model radial scalp signal is ~2x stronger (see bottom).'
     )
     ax_top.legend(loc='upper right', fontsize=9, ncol=2)

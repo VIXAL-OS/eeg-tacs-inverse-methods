@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 import numpy as np
 import matplotlib.pyplot as plt
 
-from spherical_forward import SphericalHeadModel, make_standard_montage_64
+from spherical_forward import SphericalHeadModel, make_gsn_montage_64
 from inverse_solvers import sloreta_operator, eloreta_operator
 from network_recovery import (
     sample_network_positions, make_correlated_node_timecourses,
@@ -155,7 +155,7 @@ def main():
 
     # ----- 1. Head, electrodes, source space, leadfield ------------------
     model = SphericalHeadModel()
-    electrodes = make_standard_montage_64(model)
+    electrodes = make_gsn_montage_64(model)
     build_source_space, build_leadfield = _load_sanity_helpers()
     print("\nBuilding source space (8mm grid)...")
     sources = build_source_space(model, spacing_mm=8.0)

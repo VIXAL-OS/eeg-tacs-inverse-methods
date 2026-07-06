@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 from spherical_forward import (
-    SphericalHeadModel, forward_potential, make_standard_montage_64
+    SphericalHeadModel, forward_potential, make_gsn_montage_64
 )
 from inverse_solvers import mne_operator, sloreta_operator, eloreta_operator
 from metrics import summary
@@ -126,7 +126,7 @@ def main():
     print(f"  Radii (mm): {model.radii_mm}")
     print(f"  Sigmas (S/m): {model.sigmas}")
 
-    electrodes = make_standard_montage_64(model)
+    electrodes = make_gsn_montage_64(model)
     print(f"\nElectrodes: {electrodes.shape[0]} channels")
 
     # 2. Source space

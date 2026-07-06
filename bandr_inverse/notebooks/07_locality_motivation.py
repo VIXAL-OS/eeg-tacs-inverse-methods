@@ -1,4 +1,4 @@
-"""
+﻿"""
 Locality / leadfield-coupling figure (motivation for the whole project).
 
 Quantifies why a forward model is needed for closed-loop tACS at all.
@@ -24,7 +24,7 @@ Honesty caveats (printed at runtime too):
   * Volume conductor is a 4-shell spherical head, not a real MRI-derived
     BEM. Real head geometry (skull holes, gyral folding) generally
     *increases* off-diagonal coupling, again making this a lower bound.
-  * Montage is a 64-electrode Fibonacci-spiral stand-in for the GTEN
+  * Montage is a 64-electrode Fibonacci-spiral stand-in for the geodesic net
     layout. Robustness across montage realizations is checked below.
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 from spherical_forward import (
-    SphericalHeadModel, forward_potential, make_standard_montage_64
+    SphericalHeadModel, forward_potential, make_gsn_montage_64
 )
 
 
@@ -123,7 +123,7 @@ GEOMETRY CAVEAT:
 
     model = SphericalHeadModel()
     R = model.head_radius_mm
-    base_electrodes = make_standard_montage_64(model)
+    base_electrodes = make_gsn_montage_64(model)
 
     # Coarser grid than 8mm: locality is a Riemann sum over sources,
     # so resolution doesn't move it; speeds up 5 leadfield builds.
@@ -284,9 +284,9 @@ GEOMETRY CAVEAT:
     fig.suptitle(
         'Under volume conduction, stimulating electrode i produces a '
         'comparable response at ~25 electrodes simultaneously\n'
-        '(nearest runner-up within 1–10% of the driven electrode). '
+        '(nearest runner-up within 1â€“10% of the driven electrode). '
         'Only ~4% of the total response magnitude sits on the driven '
-        'electrode itself —\n'
+        'electrode itself â€”\n'
         'a model-free controller treating the transfer as diagonal '
         'misroutes ~96% of its signal.',
         fontsize=10, y=1.02
